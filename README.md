@@ -415,6 +415,24 @@ await migrations.runOne(ctx, internal.migrations.clearField, {
 });
 ```
 
+### Automatic bandwidth management
+
+Migrations monitor transaction bandwidth usage during batch processing. If a
+batch approaches
+[transaction limits](https://docs.convex.dev/production/state/limits#transactions),
+it may stop early and let the remaining documents be picked up in the next
+batch.
+
+This helps avoid hitting limits when your `migrateOne` function performs
+expensive operations (reading related documents, writing to multiple tables,
+etc.).
+
+This works automatically with no configuration needed. If you frequently see
+batches ending early, consider reducing the batch size for that migration.
+
+**Note**: bandwidth monitoring is only available for sequential (non-parallel)
+batch processing.
+
 ### Parallelizing batches
 
 Each batch is processed serially, but within a batch you can have each

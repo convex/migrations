@@ -9,6 +9,7 @@
  */
 
 import type * as example from "../example.js";
+import type * as tests_shortCircuit from "../tests/shortCircuit.js";
 
 import type {
   ApiFromModules,
@@ -18,6 +19,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   example: typeof example;
+  "tests/shortCircuit": typeof tests_shortCircuit;
 }>;
 
 /**
