@@ -59,6 +59,8 @@ export const migrations = new Migrations(components.migrations, {
 export const renameOldUsersToUsers = migrations.define({
   table: "oldUsers",
   migrateOne: async (ctx, doc) => {
+    // Copying gives each document a new _id. Update any v.id("oldUsers")
+    // references in other tables, or they will point at deleted documents.
     const { _id: oldId, _creationTime: _oldCreationTime, ...newDoc } = doc;
     await ctx.db.insert("users", newDoc);
     await ctx.db.delete(oldId);

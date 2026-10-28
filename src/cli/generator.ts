@@ -135,6 +135,8 @@ export function renderRenameTableMigration(
   const definition = `export const ${toExportName(name)} = migrations.define({
   table: ${quote(oldTable)},
   migrateOne: async (ctx, doc) => {
+    // Copying gives each document a new _id. Update any v.id(${quote(oldTable)})
+    // references in other tables, or they will point at deleted documents.
     const { _id: oldId, _creationTime: _oldCreationTime, ...newDoc } = doc;
     await ctx.db.insert(${quote(newTable)}, newDoc);
     await ctx.db.delete(oldId);
