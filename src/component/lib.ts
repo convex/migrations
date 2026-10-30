@@ -73,11 +73,11 @@ export const migrate = mutation({
         }),
       ))!;
 
-    // Update the state if the cursor arg differs.
-    if (state.cursor !== args.cursor) {
+    // Reset explicitly on null, even when the saved cursor is already null.
+    if (state.cursor !== args.cursor || args.cursor === null) {
       // This happens if:
       // 1. The migration is being started/resumed (args.cursor unset).
-      // 2. The migration is being resumed at a different cursor.
+      // 2. The migration is being reset or resumed at a different cursor.
       // 3. There are two instances of the same migration racing.
       const worker =
         state.workerId &&
