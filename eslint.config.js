@@ -35,7 +35,7 @@ export default [
   // Convex code - Worker environment
   {
     files: ["src/**/*.{ts,tsx}", "example/convex/**/*.{ts,tsx}"],
-    ignores: ["src/react/**"],
+    ignores: ["src/react/**", "src/cli.ts", "src/cli/**"],
     languageOptions: {
       globals: globals.worker,
     },
@@ -61,6 +61,22 @@ export default [
           allowShortCircuit: true,
           allowTernary: true,
           allowTaggedTemplates: true,
+        },
+      ],
+    },
+  },
+  // CLI code - Node environment
+  {
+    files: ["src/cli.ts", "src/cli/**/*.{ts,tsx}"],
+    languageOptions: {
+      globals: globals.node,
+    },
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
         },
       ],
     },
