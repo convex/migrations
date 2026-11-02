@@ -462,6 +462,7 @@ export class Migrations<
           ({ continueCursor, page, isDone } = await range.paginate({
             cursor: args.cursor,
             numItems,
+            maximumBytesRead: 2 << 20, // 2 MiB
           }));
         } catch (e) {
           console.error(
@@ -489,17 +490,55 @@ export class Migrations<
             throw error;
           }
         }
+        let processedCount = 0;
+        let shortCircuited = false;
         if (parallelize) {
           await Promise.all(page.map(doOne));
+          processedCount = page.length;
         } else {
           for (const doc of page) {
+            // Only short-circuit when using the new paginator, since we
+            // need to re-paginate for an exact cursor. Without it we'd
+            // return the same cursor and re-process documents.
+            if (useNewPaginator && processedCount > 0) {
+              const metrics = await getTransactionMetrics();
+              if (isNearTransactionLimits(metrics)) {
+                const remaining = page.length - processedCount;
+                console.log(
+                  `Short-circuiting batch after processing ` +
+                    `${processedCount}/${page.length} documents due to ` +
+                    `transaction limits. ${remaining} documents will be ` +
+                    `retried in the next batch.`,
+                );
+                shortCircuited = true;
+                break;
+              }
+            }
             await doOne(doc);
+            processedCount++;
           }
         }
-        const result = {
-          continueCursor,
-          isDone,
-          processed: page.length,
+        let shortCircuitCursor: string = continueCursor;
+        if (shortCircuited && processedCount > 0) {
+          // Re-paginate with the exact count to get a precise cursor.
+          const q2 = paginator(ctx.db as any, paginatorSchema as any).query(
+            table,
+          ) as unknown as QueryInitializer<
+            NamedTableInfo<DataModel, TableName>
+          >;
+          const range2 = customRange ? customRange(q2) : q2;
+          const { continueCursor: exactCursor } = await (
+            range2 as any
+          ).paginate({
+            cursor: args.cursor,
+            numItems: processedCount,
+          });
+          shortCircuitCursor = exactCursor;
+        }
+        const result: MigrationResult = {
+          continueCursor: shortCircuited ? shortCircuitCursor : continueCursor,
+          isDone: shortCircuited ? false : isDone,
+          processed: processedCount,
         };
         if (args.dryRun) {
           // Throwing an error rolls back the transaction
@@ -811,6 +850,7 @@ export async function runToCompletion(
   const address = getFunctionAddress(fnRef);
   const fnHandle =
     address.functionHandle ?? (await createFunctionHandle(fnRef));
+  let previousProcessed = 0;
   while (true) {
     const status = await ctx.runMutation(component.lib.migrate, {
       name,
@@ -850,6 +890,15 @@ export async function runToCompletion(
 export function isNewFormatCursor(cursor: string | null): boolean {
   if (cursor === null) return true;
   return typeof cursor === "string" && cursor.startsWith("[");
+}
+
+function isNearTransactionLimits(metrics: TransactionMetrics): boolean {
+  for (const metric of Object.values(metrics) as TransactionMetric[]) {
+    if (metric.remaining < metric.used) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /* Type utils follow */
