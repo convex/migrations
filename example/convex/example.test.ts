@@ -51,6 +51,73 @@ describe("example", () => {
     ).rejects.toThrow("This migration fails after the first");
   });
 
+  test("runner runs one batch at a time and resumes from its saved cursor", async () => {
+    const t = initConvexTest();
+    await t.mutation(internal.example.seed, { count: 10 });
+
+    for (const processed of [2, 4]) {
+      await t.mutation(internal.example.runAll, {
+        batchSize: 2,
+        oneBatchOnly: true,
+      });
+      await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+      const [status] = await t.run((ctx) =>
+        migrations.getStatus(ctx, {
+          migrations: [internal.example.setDefaultValue],
+        }),
+      );
+      expect(status.processed).toBe(processed);
+      expect(status.isDone).toBe(false);
+      expect(status.state).not.toBe("inProgress");
+      const docs = await t.run((ctx) => ctx.db.query("myTable").collect());
+      expect(
+        docs.filter((doc) => doc.optionalField === "default"),
+      ).toHaveLength(processed / 2);
+    }
+  });
+
+  test("runner with oneBatchOnly does not start the next migration", async () => {
+    const t = initConvexTest();
+    await t.mutation(internal.example.seed, { count: 1 });
+    await t.mutation(internal.example.runAll, {
+      batchSize: 2,
+      oneBatchOnly: true,
+    });
+    await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+    const statuses = await t.query(internal.example.getStatus, {});
+    expect(
+      statuses.find(
+        (status) =>
+          status.name === getFunctionName(internal.example.setDefaultValue),
+      ),
+    ).toMatchObject({ processed: 1, isDone: true, state: "success" });
+    expect(
+      statuses
+        .filter(
+          (status) =>
+            status.name !== getFunctionName(internal.example.setDefaultValue),
+        )
+        .every((status) => status.state === "unknown"),
+    ).toBe(true);
+  });
+
+  test.each([undefined, false])(
+    "runner continues scheduling when oneBatchOnly is %s",
+    async (oneBatchOnly) => {
+      const t = initConvexTest();
+      await t.mutation(internal.example.seed, { count: 10 });
+      await t.mutation(internal.example.runAll, { batchSize: 2, oneBatchOnly });
+      const [status] = await t.run((ctx) =>
+        migrations.getStatus(ctx, {
+          migrations: [internal.example.setDefaultValue],
+        }),
+      );
+      expect(status).toMatchObject({ processed: 2, state: "inProgress" });
+    },
+  );
+
   test("runOne no-ops when the migration is already in progress", async () => {
     const t = initConvexTest();
     await t.mutation(internal.example.seed, { count: 10 });

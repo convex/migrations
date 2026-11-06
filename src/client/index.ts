@@ -277,6 +277,7 @@ export class Migrations<
         fnHandle,
         cursor,
         batchSize: args.batchSize,
+        oneBatchOnly: args.oneBatchOnly,
         next,
         dryRun: args.dryRun ?? false,
         reset: args.reset,
