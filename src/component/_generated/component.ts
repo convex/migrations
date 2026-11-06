@@ -67,6 +67,7 @@ export type ComponentApi<Name extends string | undefined = string | undefined> =
         null,
         Name
       >;
+      componentPath: FunctionReference<"query", "internal", {}, string, Name>;
       getStatus: FunctionReference<
         "query",
         "internal",

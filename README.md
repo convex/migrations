@@ -319,6 +319,11 @@ directly:
 npx convex run --component migrations lib:cancel '{name: "migrations:myMigration"}'
 ```
 
+If you mounted the component under a different name, or installed it from within
+another component, use that path instead, e.g.
+`--component myComponent/migrations`. The commands printed when you run a
+migration already use the right path.
+
 Or via `migrations.cancel` programatically.
 
 ```ts

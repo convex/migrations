@@ -206,6 +206,13 @@ export const migrate = mutation({
   },
 });
 
+// The path to this component, e.g. "migrations" or "myComponent/migrations".
+export const componentPath = query({
+  args: {},
+  returns: v.string(),
+  handler: async (ctx) => (await ctx.meta.getFunctionMetadata()).componentPath,
+});
+
 export const getStatus = query({
   args: {
     names: v.optional(v.array(v.string())),
