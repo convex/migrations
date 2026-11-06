@@ -1,0 +1,156 @@
+---
+title: "Running Migrations One at a Time"
+sidebar_label: "Running migrations"
+sidebar_position: 300
+description:
+  "Run a single migration via the Dashboard, CLI, or programmatically, plus
+  operations like dryRun, restart, stop, and status."
+---
+
+Once you've [defined a migration](./defining-migrations.mdx), you can run it on
+its own from the Dashboard, the CLI, or programmatically from another Convex
+function.
+
+## Using the Dashboard or CLI
+
+The simplest way to run a migration is to call it directly:
+
+```sh
+npx convex run migrations:setDefaultValue
+```
+
+Pass `--prod` to run in production.
+
+Running it from the dashboard:
+
+![Dashboard screenshot](../dashboard_screenshot.png)
+
+You can also define a general-purpose runner that accepts a migration by name:
+
+```ts
+export const run = migrations.runner();
+```
+
+Then run it with the
+[function name](https://docs.convex.dev/functions/query-functions#query-names):
+
+```sh
+npx convex run migrations:run '{fn: "migrations:setDefaultValue"}'
+```
+
+## Programmatically
+
+You can also run migrations from other Convex mutations or actions:
+
+```ts
+await migrations.runOne(ctx, internal.migrations.setDefaultValue);
+```
+
+## Behavior
+
+- If it is already running, the call is a no-op and the existing worker keeps
+  running. `runOne`, `runSerially`, and `runner` check for in-progress
+  migrations before attempting to start them, avoiding unnecessary conflicts
+  with active batches when a deploy script is run again.
+- If it had previously failed on some batch, it will continue from that batch
+  unless you manually specify `cursor` or `reset`.
+- If you provide an explicit `cursor` (`null` means to start at the beginning),
+  it will start from there unless the migration is already in progress.
+- If you pass `reset: true`, it will restart the migration from the beginning
+  for all migrations in the group (including any `next` migrations).
+- If you pass `true` for `dryRun` then it will run one batch and then throw, so
+  no changes are committed, and you can see what it would have done. See
+  [below](#test-a-migration-with-dryrun). This is good for validating it does
+  what you expect.
+
+To run a series of migrations in order, see
+[Team workflows](./team-workflows.mdx).
+
+## Operations
+
+### Test a migration with dryRun
+
+Before running a migration that may irreversibly change data, you can validate a
+batch by passing `dryRun` to any `runner` or `runOne` command:
+
+```sh
+npx convex run migrations:setDefaultValue '{dryRun: true}'
+```
+
+### Restart a migration
+
+Pass `reset: true` to restart a migration from the beginning. An active worker
+continues running; stop the migration first if you need to restart it while it
+is in progress.
+
+```sh
+npx convex run migrations:setDefaultValue '{reset: true}'
+```
+
+If you specify `next` or run a defined series of migrations, this will reset the
+cursor for all migrations in the group.
+
+An explicit restart refreshes `latestStart`, clears `latestEnd`, and resets the
+processed count, even if the saved cursor is already `null` after a failure in
+the first batch. Resuming without `reset` or an explicit cursor preserves the
+original start time.
+
+```sh
+npx convex run migrations:runAll '{reset: true}'
+```
+
+You can also pass in any valid cursor to start from. You can find valid cursors
+in the response of calls to `getStatus`. This can allow retrying a migration
+from a known good point as you iterate on the code.
+
+### Stop a migration
+
+You can stop a migration from the CLI or dashboard, calling the component API
+directly:
+
+```sh
+npx convex run --component migrations lib:cancel '{name: "migrations:myMigration"}'
+```
+
+Or via `migrations.cancel` programmatically.
+
+```ts
+await migrations.cancel(ctx, internal.migrations.myMigration);
+```
+
+### Get the status of migrations
+
+To see the live status of migrations as they progress, you can query it via the
+CLI:
+
+```sh
+npx convex run --component migrations lib:getStatus --watch
+```
+
+The `--watch` will live-update the status as it changes. Or programmatically:
+
+```ts
+import type { MigrationStatus } from "@convex-dev/migrations";
+
+const status: MigrationStatus[] = await migrations.getStatus(ctx, {
+  limit: 10,
+});
+// or
+const status: MigrationStatus[] = await migrations.getStatus(ctx, {
+  migrations: [
+    internal.migrations.setDefaultValue,
+    internal.migrations.validateRequiredField,
+    internal.migrations.convertUnionField,
+  ],
+});
+```
+
+The type is annotated to avoid circular type dependencies, for instance if you
+are returning the result from a query that is defined in the same file as the
+referenced migrations.
+
+## Related
+
+- [Team workflows](./team-workflows.mdx) for running a series of migrations.
+- [Testing](./testing.mdx) for running a migration synchronously with
+  `runToCompletion`.
