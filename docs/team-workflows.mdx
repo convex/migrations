@@ -1,0 +1,96 @@
+---
+title: "Team Workflows for Migrations"
+sidebar_label: "Team workflows"
+sidebar_position: 400
+description:
+  "Keep a running list of migrations and run them automatically after each
+  production deploy."
+---
+
+Over the lifetime of a project, your team will define many migrations. This page
+describes a workflow built on two practices: keeping a running list of all
+migrations as you define them, and running that list automatically as part of
+every production deploy.
+
+## Defining new migrations and keeping a running list
+
+You can run a series of migrations in order. This is useful if some migrations
+depend on previous ones, or if you keep a running list of all migrations that
+should run on the next deployment.
+
+Pass a list of migrations to `runner` to have it run a series of migrations
+instead of just one. When a teammate writes a new migration, they add it to this
+list:
+
+```ts
+export const runAll = migrations.runner([
+  internal.migrations.setDefaultValue,
+  internal.migrations.validateRequiredField,
+  internal.migrations.convertUnionField,
+]);
+```
+
+Then just run:
+
+```sh
+npx convex run migrations:runAll # migrations:runAll is equivalent to convex/migrations.ts:runAll on the CLI
+```
+
+When calling a migration directly, or with the `runner` functions, you can pass
+a "next" argument to run a series of migrations after the first:
+
+```sh
+npx convex run migrations:setDefaultValue '{next:["migrations:clearField"]}'
+# OR
+npx convex run migrations:run '{fn: "migrations:setDefaultValue", next:["migrations:clearField"]}'
+```
+
+You can also run a series of migrations programmatically with `runSerially`:
+
+```ts
+await migrations.runSerially(ctx, [
+  internal.migrations.setDefaultValue,
+  internal.migrations.validateRequiredField,
+  internal.migrations.convertUnionField,
+]);
+```
+
+### Behavior
+
+- If any migration in the requested series is already in progress, the new call
+  is a no-op before starting any migrations. The existing worker continues its
+  original series. To start a different series, call it again after the active
+  migration finishes.
+- If a migration had already completed, it will skip it.
+- If a migration had partial progress, it will resume from where it left off.
+- If a migration fails or is canceled, it will not continue on, in case you had
+  some dependencies between the migrations. Call the series again to retry.
+
+Note: if you start multiple serial migrations, the behavior is:
+
+- If they don't overlap on functions, they will happily run in parallel.
+- If they have a function in common and one completes before the other attempts
+  it, the second will just skip it.
+- If they have a function in common and one is in progress, the second call will
+  no-op without starting its series.
+
+## Running migrations post-deploy automatically
+
+As part of your build and deploy command, you can chain the corresponding
+`npx convex run` command, such as:
+
+```sh
+npx convex deploy --cmd 'npm run build' && npx convex run convex/migrations.ts:runAll --prod
+```
+
+This is the heart of the recommended team workflow: when a teammate writes a
+migration, they add it to the `runAll` list. The deploy command then runs the
+whole list, and because already-completed migrations are skipped, the only
+migrations that actually do work are the new ones. So each migration runs
+automatically the next time you deploy to production, without anyone needing to
+run it by hand.
+
+## Learn more
+
+- [Defining migrations](./defining-migrations.mdx)
+- [Running migrations](./running-migrations.mdx)
