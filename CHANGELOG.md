@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- The CLI commands printed when running a migration now use the name the
+  migrations component was mounted as, rather than assuming `migrations`. The
+  component reports its own path via a new `lib:componentPath` query.
+
 ## 0.3.7
 
 - Updates the /test entrypoint for compatibility with convex-test's new

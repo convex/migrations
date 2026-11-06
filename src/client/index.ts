@@ -259,12 +259,11 @@ export class Migrations<
         ...(next ?? []).map((n) => n.name),
       ]);
       if (inProgress) {
-        const { componentPath } = await getFunctionMetadata();
         return logStatusAndInstructions(
           inProgress.name,
           inProgress,
           args,
-          componentPath,
+          await ctx.runQuery(this.component.lib.componentPath, {}),
         );
       }
     }
@@ -294,8 +293,12 @@ export class Migrations<
       }
     }
 
-    const { componentPath } = await getFunctionMetadata();
-    return logStatusAndInstructions(name, status, args, componentPath);
+    return logStatusAndInstructions(
+      name,
+      status,
+      args,
+      await ctx.runQuery(this.component.lib.componentPath, {}),
+    );
   }
 
   /**
