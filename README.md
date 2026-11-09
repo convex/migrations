@@ -51,6 +51,24 @@ Typical steps for doing a migration:
 See [this Stack post](https://stack.convex.dev/migrating-data-with-mutations)
 for walkthroughs of common use cases.
 
+## Documentation
+
+Detailed docs are organized in the [`docs/`](./docs) folder:
+
+- [Getting Started](./docs/getting-started.mdx) – install the component and
+  define and run your first migration.
+- [Define migrations](./docs/defining-migrations.mdx) – `migrateOne`, shorthand
+  patches, and migrating a subset of a table with `customRange`.
+- [Running migrations](./docs/running-migrations.mdx) – run one at a time from
+  the dashboard, CLI, or code, plus operations like `dryRun`, restart, stop, and
+  status.
+- [Team workflows](./docs/team-workflows.mdx) – keep a running list of
+  migrations and run them automatically after each production deploy.
+- [Configuration](./docs/configuration.mdx) – custom `internalMutation`, batch
+  size, parallelization, and shorthand running syntax.
+- [Running synchronously](./docs/testing.mdx) – `runToCompletion` from an action
+  or test.
+
 ## Pre-requisite: Convex
 
 You'll need an existing Convex project to use the component. Convex is a hosted
@@ -64,9 +82,11 @@ Run `npm create convex` or follow any of the
 
 Install the component package:
 
-```ts
+```sh
 npm install @convex-dev/migrations
 ```
+
+Requires `convex@^1.42.0` and `convex-helpers@^0.1.115` as peer dependencies.
 
 Create a `convex.config.ts` file in your app's `convex/` folder and install the
 component by calling `use`:
@@ -93,16 +113,16 @@ examples below from `internal.migrations.*` to your new file name, like
 ```ts
 import { Migrations } from "@convex-dev/migrations";
 import { components } from "./_generated/api.js";
-import schema from "./_generated/schema.js";
+import schema from "./schema.js";
 
 export const migrations = new Migrations(components.migrations, { schema });
 ```
 
-The `schema` provides type safety for migration definitions and support
-for pagination over custom indexes with
-[`customRange`](#migrating-a-subset-of-a-table-using-an-index).
-As always, database operations in migrations will abide
-by your schema definition at runtime. **Note**: if you use
+The `schema` provides type safety for migration definitions and support for
+pagination over custom indexes with
+[`customRange`](#migrating-a-subset-of-a-table-using-an-index). As always,
+database operations in migrations will abide by your schema definition at
+runtime. **Note**: if you use
 [custom functions](https://stack.convex.dev/custom-functions) to override
 `internalMutation`, see
 [below](#override-the-internalmutation-to-apply-custom-db-behavior).
@@ -146,7 +166,7 @@ have on the table, or the built-in `by_creation_time` index.
 ```ts
 import { Migrations } from "@convex-dev/migrations";
 import { components } from "./_generated/api.js";
-import schema from "./_generated/schema.js";
+import schema from "./schema.js";
 
 export const migrations = new Migrations(components.migrations, { schema });
 
@@ -200,21 +220,24 @@ See [below](#shorthand-running-syntax) for a way to just pass `setDefaultValue`.
 You can also run migrations from other Convex mutations or actions:
 
 ```ts
-await migrations.runOne(ctx, internal.example.setDefaultValue);
+await migrations.runOne(ctx, internal.migrations.setDefaultValue);
 ```
 
 ### Behavior
 
-- If it is already running it will refuse to start another duplicate worker.
+- If it is already running, the call is a no-op and the existing worker keeps
+  running. `runOne`, `runSerially`, and `runner` check for in-progress
+  migrations before attempting to start them, avoiding unnecessary conflicts
+  with active batches when a deploy script is run again.
 - If it had previously failed on some batch, it will continue from that batch
   unless you manually specify `cursor` or `reset`.
 - If you provide an explicit `cursor` (`null` means to start at the beginning),
-  it will start from there.
+  it will start from there unless the migration is already in progress.
 - If you pass `reset: true`, it will restart the migration from the beginning
   for all migrations in the group (including any `next` migrations).
 - If you pass `true` for `dryRun` then it will run one batch and then throw, so
   no changes are committed, and you can see what it would have done. See
-  [below](#test-a-migration-with-dryrun) This is good for validating it does
+  [below](#test-a-migration-with-dryrun). This is good for validating it does
   what you expect.
 
 ## Running migrations serially
@@ -263,7 +286,10 @@ await migrations.runSerially(ctx, [
 
 ### Behavior
 
-- If a migration is already in progress when attempted, it will no-op.
+- If any migration in the requested series is already in progress, the new call
+  is a no-op before starting any migrations. The existing worker continues its
+  original series. To start a different series, call it again after the active
+  migration finishes.
 - If a migration had already completed, it will skip it.
 - If a migration had partial progress, it will resume from where it left off.
 - If a migration fails or is canceled, it will not continue on, in case you had
@@ -274,8 +300,8 @@ Note: if you start multiple serial migrations, the behavior is:
 - If they don't overlap on functions, they will happily run in parallel.
 - If they have a function in common and one completes before the other attempts
   it, the second will just skip it.
-- If they have a function in common and one is in progress, the second will
-  no-op and not run any further migrations in its series.
+- If they have a function in common and one is in progress, the second call will
+  no-op without starting its series.
 
 ## Operations
 
@@ -290,7 +316,9 @@ npx convex run migrations:setDefaultValue '{dryRun: true}'
 
 ### Restart a migration
 
-Pass `reset: true` to force a migration to start over from the beginning.
+Pass `reset: true` to restart a migration from the beginning. An active worker
+continues running; stop the migration first if you need to restart it while it
+is in progress.
 
 ```sh
 npx convex run migrations:setDefaultValue '{reset: true}'
@@ -299,6 +327,11 @@ npx convex run migrations:setDefaultValue '{reset: true}'
 If you specify `next` or run a defined series of migrations, this will reset the
 cursor for all migrations in the group.
 
+An explicit restart refreshes `latestStart`, clears `latestEnd`, and resets the
+processed count, even if the saved cursor is already `null` after a failure in
+the first batch. Resuming without `reset` or an explicit cursor preserves the
+original start time.
+
 ```sh
 npx convex run migrations:runAll '{reset: true}'
 ```
@@ -306,9 +339,6 @@ npx convex run migrations:runAll '{reset: true}'
 You can also pass in any valid cursor to start from. You can find valid cursors
 in the response of calls to `getStatus`. This can allow retrying a migration
 from a known good point as you iterate on the code.
-
-Note: if you're starting a migration from a specific cursor from the CLI or
-dashboard, do not pass `dryRun: false` explicitly, leave it undefined.
 
 ### Stop a migration
 
@@ -319,7 +349,7 @@ directly:
 npx convex run --component migrations lib:cancel '{name: "migrations:myMigration"}'
 ```
 
-Or via `migrations.cancel` programatically.
+Or via `migrations.cancel` programmatically.
 
 ```ts
 await migrations.cancel(ctx, internal.migrations.myMigration);
@@ -337,6 +367,8 @@ npx convex run --component migrations lib:getStatus --watch
 The `--watch` will live-update the status as it changes. Or programmatically:
 
 ```ts
+import type { MigrationStatus } from "@convex-dev/migrations";
+
 const status: MigrationStatus[] = await migrations.getStatus(ctx, {
   limit: 10,
 });
@@ -367,8 +399,8 @@ npx convex deploy --cmd 'npm run build' && npx convex run convex/migrations.ts:r
 
 ### Override the internalMutation to apply custom DB behavior
 
-You can customize which `internalMutation` implementation the underly migration
-should use.
+You can customize which `internalMutation` implementation the underlying
+migration should use.
 
 This might be important if you use
 [custom functions](https://stack.convex.dev/custom-functions) to intercept
@@ -441,7 +473,7 @@ a prefix:
 
 ```ts
 export const migrations = new Migrations(components.migrations, {
-  internalMigration,
+  schema,
   migrationsLocationPrefix: "migrations:",
 });
 ```
@@ -476,38 +508,55 @@ export const myAction = internalAction({
   args: {},
   handler: async (ctx) => {
     //...
-    const toRun = internal.example.setDefaultValue;
+    const toRun = internal.migrations.setDefaultValue;
     await runToCompletion(ctx, components.migrations, toRun);
   },
 });
 ```
 
-In a test:
+In a test, `defineTestApp` registers the component and provides typed component
+references. Import your migration module and register it with `defineModules`:
 
 ```ts
-import { test } from "vitest";
-import { convexTest } from "convex-test";
+import { expect, test } from "vitest";
+import { defineTestApp } from "convex-test";
 import component from "@convex-dev/migrations/test";
 import { runToCompletion } from "@convex-dev/migrations";
-import { components, internal } from "./_generated/api";
-import schema from "./schema";
+import schema from "./schema.js";
+import * as migrationDefinitions from "./migrations.js";
+
+const app = defineTestApp({
+  schema,
+  components: { migrations: component },
+});
+const { internal, createTest } = app.defineModules({
+  migrations: migrationDefinitions,
+});
 
 test("test setDefaultValue migration", async () => {
-  const t = convexTest(schema);
-  // Register the component in the test instance
-  component.register(t);
+  const t = createTest();
+
+  // Add sample data that matches your schema, without optionalField.
+  await t.run(async (ctx) => {
+    await ctx.db.insert("myTable", {
+      requiredField: "example",
+      unionField: "value",
+    });
+  });
 
   await t.run(async (ctx) => {
-    // Add sample data to migrate
-    await ctx.db.insert("myTable", { optionalField: undefined });
+    await runToCompletion(
+      ctx,
+      app.components.migrations,
+      internal.migrations.setDefaultValue,
+      { batchSize: 1 },
+    );
+  });
 
-    // Run the migration to completion
-    const migrationToTest = internal.example.setDefaultValue;
-    await runToCompletion(ctx, components.migrations, migrationToTest);
-
-    // Assert that the migration was successful by checking the data
+  await t.run(async (ctx) => {
     const docs = await ctx.db.query("myTable").collect();
-    expect(docs.every((doc) => doc.optionalField !== undefined)).toBe(true);
+    expect(docs).toHaveLength(1);
+    expect(docs[0].optionalField).toBe("default");
   });
 });
 ```

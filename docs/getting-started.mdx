@@ -1,0 +1,118 @@
+---
+title: "Getting Started with Migrations"
+sidebar_label: "Getting Started"
+sidebar_position: 100
+description:
+  "Install the Convex migrations component and define and run your first online,
+  stateful migration."
+---
+
+Migrations allow you to define functions that run on all documents in a table
+(or a specified subset). They run in batches asynchronously (online migration).
+The component tracks the migration's state so it can avoid running twice, pick
+up where it left off (in the case of a bug or failure along the way), and expose
+the migration state in realtime via Convex queries.
+
+See the [migration primer post](https://stack.convex.dev/intro-to-migrations)
+for a conceptual overview of online vs. offline migrations. If your migration is
+trivial and you're moving fast, also check out
+[lightweight migrations in the dashboard](https://stack.convex.dev/lightweight-zero-downtime-migrations).
+
+## Pre-requisite: Convex
+
+You'll need an existing Convex project to use the component. Convex is a hosted
+backend platform, including a database, serverless functions, and a ton more you
+can learn about [here](https://docs.convex.dev/get-started).
+
+Run `npm create convex` or follow any of the
+[quickstarts](https://docs.convex.dev/home) to set one up.
+
+## Installation
+
+Install the component package:
+
+```sh
+npm install @convex-dev/migrations
+```
+
+Requires `convex@^1.42.0` and `convex-helpers@^0.1.115` as peer dependencies.
+
+Create a `convex.config.ts` file in your app's `convex/` folder and install the
+component by calling `use`:
+
+```ts
+// convex/convex.config.ts
+import { defineApp } from "convex/server";
+import migrations from "@convex-dev/migrations/convex.config.js";
+
+const app = defineApp();
+app.use(migrations);
+
+export default app;
+```
+
+## Initialization
+
+Examples below are assuming the code is in `convex/migrations.ts`. This is not a
+requirement. If you want to use a different file, make sure to change the
+examples below from `internal.migrations.*` to your new file name, like
+`internal.myFolder.myMigrationsFile.*` or CLI arguments like `migrations:*` to
+`myFolder/myMigrationsFile:*`.
+
+```ts
+import { Migrations } from "@convex-dev/migrations";
+import { components } from "./_generated/api.js";
+import schema from "./schema.js";
+
+export const migrations = new Migrations(components.migrations, { schema });
+```
+
+The `schema` provides type safety for migration definitions and support for
+pagination over custom indexes with `customRange` (see
+[Defining migrations](./defining-migrations.mdx)). As always, database
+operations in migrations will abide by your schema definition at runtime.
+**Note**: if you use
+[custom functions](https://stack.convex.dev/custom-functions) to override
+`internalMutation`, see [Configuration options](./configuration.mdx).
+
+## Define and run your first migration
+
+Within the `migrateOne` function, you can write code to modify a single document
+in the specified table. Making changes is optional, and you can also read and
+write to other tables from this function.
+
+```ts
+export const setDefaultValue = migrations.define({
+  table: "myTable",
+  migrateOne: async (ctx, doc) => {
+    if (doc.optionalField === undefined) {
+      await ctx.db.patch(doc._id, { optionalField: "default" });
+    }
+  },
+});
+```
+
+You can then run it directly from the CLI:
+
+```sh
+npx convex run migrations:setDefaultValue
+```
+
+See [Defining migrations](./defining-migrations.mdx) for more ways to define
+migrations, and [Running migrations](./running-migrations.mdx) for running them
+one at a time, serially, programmatically, and in production deploys.
+
+## Typical steps for doing a migration
+
+1. Modify your schema to allow old and new values. Typically this is adding a
+   new optional field or marking a field as optional so it can be deleted. As
+   part of this, update your code to handle both versions.
+2. Define a migration to change the data to the new schema.
+3. Push the migration and schema changes.
+4. Run the migration(s) to completion.
+5. Modify your schema and code to assume the new value. Pushing this change will
+   only succeed once all the data matches the new schema. This is the default
+   behavior for Convex, unless you disable schema validation.
+
+See [this Stack post](https://stack.convex.dev/migrating-data-with-mutations)
+for walkthroughs of common use cases.
