@@ -8,10 +8,6 @@
   without scheduling another batch or the next migration (#74).
 - 09cb777: Refresh the start timestamp when restarting a migration after a
   first-batch failure with `reset: true` or an explicit `cursor: null` (#76).
-- dbd7b45: Return the component API from `convex-test`'s `registerComponent` in
-  the `/test` registration helper.
-- dc87b03: Correct the package's repository, homepage, and issue URLs to point
-  to `convex/migrations` (#73).
 
 ## 0.3.7
 
