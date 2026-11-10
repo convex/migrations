@@ -6,6 +6,8 @@
 
 - afe2f81: Fix `Migrations.runner()` so `oneBatchOnly: true` runs only one batch
   without scheduling another batch or the next migration (#74).
+- 09cb777: Refresh the start timestamp when restarting a migration after a
+  first-batch failure with `reset: true` or an explicit `cursor: null` (#76).
 
 ## 0.3.7
 
