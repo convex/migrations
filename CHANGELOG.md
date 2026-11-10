@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.8
+
+### Patch Changes
+
+- afe2f81: Fix `Migrations.runner()` so `oneBatchOnly: true` runs only one batch
+  without scheduling another batch or the next migration (#74).
+
 ## 0.3.7
 
 - Updates the /test entrypoint for compatibility with convex-test's new
