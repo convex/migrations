@@ -26,6 +26,7 @@
     "typecheck": "tsc --noEmit && tsc -p example && tsc -p example/convex",
     "lint": "eslint .",
     "check": "npm run test && npm run typecheck && npm run lint",
+    "version:ci": "changeset version && npm install --package-lock-only --ignore-scripts --no-audit --no-fund",
     "test": "vitest run --typecheck",
     "test:e2e": "convex dev --once --typecheck-components",
     "test:watch": "vitest --typecheck --clearScreen false",
