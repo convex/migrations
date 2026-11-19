@@ -1,11 +1,29 @@
-import { describe, test, expect } from "vitest";
-import { Migrations, DEFAULT_BATCH_SIZE, isNewFormatCursor } from "./index.js";
+import { describe, test, expect, expectTypeOf } from "vitest";
+import type { Infer } from "convex/values";
+import {
+  Migrations,
+  DEFAULT_BATCH_SIZE,
+  isNewFormatCursor,
+  type MigrationArgs,
+  type MigrationResult,
+  vMigrationArgs,
+  vMigrationReturns,
+} from "./index.js";
 import type { ComponentApi } from "../component/_generated/component.js";
 
 describe("Migrations class", () => {
   test("can instantiate without error", () => {
     const dummyComponent = {} as ComponentApi;
     expect(() => new Migrations(dummyComponent)).not.toThrow();
+  });
+});
+
+describe("exported validators", () => {
+  test("match the MigrationArgs and MigrationResult types", () => {
+    expectTypeOf<Infer<typeof vMigrationArgs>>().toEqualTypeOf<MigrationArgs>();
+    expectTypeOf<
+      Infer<typeof vMigrationReturns>
+    >().toEqualTypeOf<MigrationResult>();
   });
 });
 

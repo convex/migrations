@@ -164,31 +164,6 @@ export const validateRequiredField = migrations.define({
 
 Note: to use customRange, you must provide your schema to Migrations.
 
-### Custom migration functions
-
-Any internal mutation that takes `vMigrationArgs` and returns
-`vMigrationReturns` can be run like a migration, for steps that don't walk a
-table. Each call should do one batch of work and return `isDone: true` once it's
-finished.
-
-```ts
-import { vMigrationArgs, vMigrationReturns } from "@convex-dev/migrations";
-
-export const addSettingsRow = internalMutation({
-  args: vMigrationArgs,
-  returns: vMigrationReturns,
-  handler: async (ctx) => {
-    await ctx.db.insert("settings", { theme: "light" });
-    return { isDone: true, continueCursor: "", processed: 1 };
-  },
-});
-
-export const runAll = migrations.runner([
-  internal.migrations.setDefaultValue,
-  internal.migrations.addSettingsRow,
-]);
-```
-
 ## Running migrations one at a time
 
 ### Using the Dashboard or CLI

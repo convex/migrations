@@ -11,16 +11,10 @@ export const migrationArgs = {
 };
 export type MigrationArgs = ObjectType<typeof migrationArgs>;
 
-/**
- * Args validator for a migration function. Use it to write a custom migration
- * mutation that can be passed to `runner`, `runOne` or `runSerially`.
- */
+/** Args validator for migration functions. */
 export const vMigrationArgs = v.object(migrationArgs);
 
-/**
- * Returns validator for a migration function. Each call processes one batch
- * and reports where to continue from and whether the migration is done.
- */
+/** Returns validator for migration functions. */
 export const vMigrationReturns = v.object({
   continueCursor: v.string(),
   isDone: v.boolean(),
