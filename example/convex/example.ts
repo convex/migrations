@@ -1,4 +1,9 @@
-import { Migrations, type MigrationStatus } from "@convex-dev/migrations";
+import {
+  Migrations,
+  type MigrationStatus,
+  vMigrationArgs,
+  vMigrationReturns,
+} from "@convex-dev/migrations";
 import { v } from "convex/values";
 import { components, internal } from "./_generated/api.js";
 import { internalMutation, internalQuery } from "./_generated/server.js";
@@ -60,6 +65,21 @@ export const failingMigration = migrations.define({
     if (doc._id !== (await ctx.db.query("myTable").first())?._id) {
       throw new Error("This migration fails after the first");
     }
+  },
+});
+
+// A custom migration that doesn't walk a table. Any internal mutation with
+// these args and returns can be run with runner, runOne or runSerially.
+// Returning isDone: true records it as done after this one call.
+export const addPlaceholderRow = internalMutation({
+  args: vMigrationArgs,
+  returns: vMigrationReturns,
+  handler: async (ctx) => {
+    await ctx.db.insert("myTable", {
+      requiredField: "placeholder",
+      unionField: "placeholder",
+    });
+    return { isDone: true, continueCursor: "", processed: 1 };
   },
 });
 

@@ -197,6 +197,24 @@ describe("example", () => {
     expect(clearFieldStatus.isDone).toBe(false);
   });
 
+  test("custom migration with exported validators runs once", async () => {
+    const t = initConvexTest();
+    const first = await t.run((ctx) =>
+      migrations.runOne(ctx, internal.example.addPlaceholderRow),
+    );
+    expect(first.state).toBe("success");
+    expect(first.processed).toBe(1);
+    // Running it again is a no-op because it's recorded as done.
+    const second = await t.run((ctx) =>
+      migrations.runOne(ctx, internal.example.addPlaceholderRow),
+    );
+    expect(second.state).toBe("success");
+    await t.run(async (ctx) => {
+      const docs = await ctx.db.query("myTable").collect();
+      expect(docs).toHaveLength(1);
+    });
+  });
+
   test("test migrating with function handle", async () => {
     const t = initConvexTest();
     await t.mutation(internal.example.seed, { count: 10 });

@@ -28,8 +28,11 @@ import {
   migrationArgs,
   type MigrationResult,
   type MigrationStatus,
+  vMigrationArgs,
+  vMigrationReturns,
 } from "../shared.js";
 export type { MigrationArgs, MigrationResult, MigrationStatus };
+export { vMigrationArgs, vMigrationReturns };
 
 import { ConvexError, type GenericId } from "convex/values";
 import type { ComponentApi } from "../component/_generated/component.js";
