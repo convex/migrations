@@ -5,9 +5,7 @@ import {
   DEFAULT_BATCH_SIZE,
   isNewFormatCursor,
   type MigrationArgs,
-  type MigrationResult,
   vMigrationArgs,
-  vMigrationReturns,
 } from "./index.js";
 import type { ComponentApi } from "../component/_generated/component.js";
 
@@ -18,12 +16,9 @@ describe("Migrations class", () => {
   });
 });
 
-describe("exported validators", () => {
-  test("match the MigrationArgs and MigrationResult types", () => {
+describe("vMigrationArgs", () => {
+  test("matches the MigrationArgs type", () => {
     expectTypeOf<Infer<typeof vMigrationArgs>>().toEqualTypeOf<MigrationArgs>();
-    expectTypeOf<
-      Infer<typeof vMigrationReturns>
-    >().toEqualTypeOf<MigrationResult>();
   });
 });
 

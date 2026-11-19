@@ -2,5 +2,4 @@
 "@convex-dev/migrations": patch
 ---
 
-Export the `vMigrationArgs` and `vMigrationReturns` validators for migration
-functions (#88).
+Export the `vMigrationArgs` validator for migration function args (#88).

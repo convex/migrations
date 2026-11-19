@@ -25,14 +25,12 @@ import {
 } from "convex/server";
 import {
   type MigrationArgs,
-  migrationArgs,
+  vMigrationArgs,
   type MigrationResult,
   type MigrationStatus,
-  vMigrationArgs,
-  vMigrationReturns,
 } from "../shared.js";
 export type { MigrationArgs, MigrationResult, MigrationStatus };
-export { vMigrationArgs, vMigrationReturns };
+export { vMigrationArgs };
 
 import { ConvexError, type GenericId } from "convex/values";
 import type { ComponentApi } from "../component/_generated/component.js";
@@ -152,7 +150,7 @@ export class Migrations<
       | MigrationFunctionReference[],
   ) {
     return internalMutationGeneric({
-      args: migrationArgs,
+      args: vMigrationArgs,
       handler: async (ctx, args) => {
         const [specificMigration, next] = Array.isArray(
           specificMigrationOrSeries,
@@ -376,7 +374,7 @@ export class Migrations<
         "internal"
       >) ?? (internalMutationGeneric as MutationBuilder<DataModel, "internal">)
     )({
-      args: migrationArgs,
+      args: vMigrationArgs,
       handler: async (ctx, args) => {
         // Auto-detect function name for direct CLI/dashboard invocation.
         // The component always provides cursor and dryRun when scheduling
