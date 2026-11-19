@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.9
+
+### Patch Changes
+
+- 3246eb9: Export the `vMigrationArgs` validator for migration function args
+  (#88).
+
 ## 0.3.8
 
 ### Patch Changes
