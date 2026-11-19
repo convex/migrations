@@ -2,7 +2,7 @@ import { defineTestApp } from "convex-test";
 import { createFunctionHandle } from "convex/server";
 import { describe, expect, test, vi } from "vitest";
 import type { MigrationResult } from "../client/index.js";
-import { migrationArgs } from "../shared.js";
+import { vMigrationArgs } from "../shared.js";
 import * as lib from "./lib.js";
 import schema from "./schema.js";
 
@@ -11,7 +11,7 @@ const { api, createTest } = app.defineModules({
   lib,
   fns: {
     doneMigration: app.mutation({
-      args: migrationArgs,
+      args: vMigrationArgs,
       handler: async (): Promise<MigrationResult> => {
         return {
           isDone: true,
@@ -21,7 +21,7 @@ const { api, createTest } = app.defineModules({
       },
     }),
     doneMigration2: app.mutation({
-      args: migrationArgs,
+      args: vMigrationArgs,
       handler: async (): Promise<MigrationResult> => {
         return {
           isDone: true,
@@ -31,7 +31,7 @@ const { api, createTest } = app.defineModules({
       },
     }),
     inProgressMigration: app.mutation({
-      args: migrationArgs,
+      args: vMigrationArgs,
       handler: async (): Promise<MigrationResult> => {
         // Simulates a migration that processes 10 items and needs to continue
         return {
