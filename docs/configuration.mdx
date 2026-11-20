@@ -1,0 +1,116 @@
+---
+title: "Migrations Configuration Options"
+sidebar_label: "Configuration"
+sidebar_position: 500
+description:
+  "Customize the internalMutation, batch size, parallelization, and shorthand
+  running syntax for migrations."
+---
+
+The `Migrations` constructor and `define` accept several options for tuning how
+migrations run. See [Defining migrations](./defining-migrations.mdx) for the
+basics of declaring migrations.
+
+## Override the internalMutation to apply custom DB behavior
+
+You can customize which `internalMutation` implementation the underlying
+migration should use.
+
+This might be important if you use
+[custom functions](https://stack.convex.dev/custom-functions) to intercept
+database writes to apply validation or
+[trigger operations on changes](https://stack.convex.dev/triggers).
+
+Assuming you define your own `internalMutation` in `convex/functions.ts`:
+
+```ts
+import { internalMutation } from "./functions";
+import { Migrations } from "@convex-dev/migrations";
+import { components } from "./_generated/api";
+
+export const migrations = new Migrations(components.migrations, {
+  internalMutation,
+});
+```
+
+See [this article](https://stack.convex.dev/migrating-data-with-mutations) for
+more information on usage and advanced patterns.
+
+## Custom batch size
+
+The component will fetch your data in batches of 100, and call your function on
+each document in a batch. If you want to change the batch size, you can specify
+it. This can be useful if your documents are large, to avoid running over the
+[transaction limit](https://docs.convex.dev/production/state/limits#transactions),
+or if your documents are updating frequently and you are seeing OCC conflicts
+while migrating.
+
+```ts
+export const clearField = migrations.define({
+  table: "myTable",
+  batchSize: 10,
+  migrateOne: () => ({ optionalField: undefined }),
+});
+```
+
+You can also override this batch size for an individual invocation:
+
+```ts
+await migrations.runOne(ctx, internal.migrations.clearField, {
+  batchSize: 1,
+});
+```
+
+To change the default for all migrations, pass `defaultBatchSize` to the
+constructor:
+
+```ts
+export const migrations = new Migrations(components.migrations, {
+  schema,
+  defaultBatchSize: 10,
+});
+```
+
+## Parallelizing batches
+
+Each batch is processed serially, but within a batch you can have each
+`migrateOne` call run in parallel if you pass `parallelize: true`. If you do so,
+ensure your callback doesn't assume that each call is isolated. For instance, if
+each call reads then updates the same counter, then multiple functions in the
+same batch could read the same counter value, and get off by one. As a result,
+migrations are run serially by default.
+
+```ts
+export const clearField = migrations.define({
+  table: "myTable",
+  parallelize: true,
+  migrateOne: () => ({ optionalField: undefined }),
+});
+```
+
+## Shorthand running syntax
+
+For those that don't want to type out `migrations:myNewMigration` every time
+they run a migration from the CLI or dashboard, especially if you define your
+migrations elsewhere like `ops/db/migrations:myNewMigration`, you can configure
+a prefix:
+
+```ts
+export const migrations = new Migrations(components.migrations, {
+  schema,
+  migrationsLocationPrefix: "migrations:",
+});
+```
+
+And then just call:
+
+```sh
+npx convex run migrations:run '{fn: "myNewMutation", next: ["myNextMutation"]}'
+```
+
+Or in code:
+
+```ts
+await migrations.getStatus(ctx, { migrations: ["myNewMutation"] });
+await migrations.cancel(ctx, "myNewMutation");
+```

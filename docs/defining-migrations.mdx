@@ -1,0 +1,70 @@
+---
+title: "Define Migrations"
+sidebar_label: "Define migrations"
+sidebar_position: 200
+description:
+  "Write migrateOne functions to modify documents in a table, optionally over a
+  custom range."
+---
+
+Within the `migrateOne` function, you can write code to modify a single document
+in the specified table. Making changes is optional, and you can also read and
+write to other tables from this function.
+
+```ts
+export const setDefaultValue = migrations.define({
+  table: "myTable",
+  migrateOne: async (ctx, doc) => {
+    if (doc.optionalField === undefined) {
+      await ctx.db.patch(doc._id, { optionalField: "default" });
+    }
+  },
+});
+```
+
+## Shorthand syntax
+
+Since the most common migration involves patching each document, if you return
+an object, it will be applied as a patch automatically.
+
+```ts
+export const clearField = migrations.define({
+  table: "myTable",
+  migrateOne: () => ({ optionalField: undefined }),
+});
+// is equivalent to `await ctx.db.patch(doc._id, { optionalField: undefined })`
+```
+
+## Migrating a subset of a table using an index
+
+If you only want to migrate a range of documents, you can avoid processing the
+whole table by specifying a `customRange`. You can use any existing index you
+have on the table, or the built-in `by_creation_time` index.
+
+```ts
+import { Migrations } from "@convex-dev/migrations";
+import { components } from "./_generated/api.js";
+import schema from "./schema.js";
+
+export const migrations = new Migrations(components.migrations, { schema });
+
+export const validateRequiredField = migrations.define({
+  table: "myTable",
+  customRange: (query) =>
+    query.withIndex("by_requiredField", (q) => q.eq("requiredField", "")),
+  migrateOne: async (_ctx, doc) => {
+    console.log("Needs fixup: " + doc._id);
+    // Shorthand for patching
+    return { requiredField: "<unknown>" };
+  },
+});
+```
+
+Note: to use customRange, you must provide your schema to Migrations.
+
+## Next steps
+
+- See [Configuration options](./configuration.mdx) for `batchSize`,
+  `parallelize`, and other ways to customize how migrations run.
+- See [Running migrations](./running-migrations.mdx) for how to run a migration
+  from the CLI, dashboard, or programmatically.

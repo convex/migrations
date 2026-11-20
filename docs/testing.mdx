@@ -1,0 +1,87 @@
+---
+title: "Running Migrations Synchronously"
+sidebar_label: "Running synchronously"
+sidebar_position: 600
+description:
+  "Run a migration to completion from an action or test with runToCompletion"
+---
+
+If you want to run a migration synchronously from a test or action, you can use
+`runToCompletion`. Note that if the action crashes or is canceled, it will not
+continue migrating in the background.
+
+For running migrations asynchronously in batches, see
+[Running migrations](./running-migrations.mdx).
+
+## From an action
+
+```ts
+import { components, internal } from "./_generated/api";
+import { internalAction } from "./_generated/server";
+import { runToCompletion } from "@convex-dev/migrations";
+
+export const myAction = internalAction({
+  args: {},
+  handler: async (ctx) => {
+    //...
+    const toRun = internal.migrations.setDefaultValue;
+    await runToCompletion(ctx, components.migrations, toRun);
+  },
+});
+```
+
+## In a test
+
+You can run a migration to completion inside a
+[convex-test](https://docs.convex.dev/testing/convex-test) test. With
+`convex-test@0.0.62` or later, `defineTestApp` registers the component each time
+`createTest` is called and exposes typed references through `app.components`.
+Import your migration module and register it with `defineModules`:
+
+```ts
+import { expect, test } from "vitest";
+import { defineTestApp } from "convex-test";
+import component from "@convex-dev/migrations/test";
+import { runToCompletion } from "@convex-dev/migrations";
+import schema from "./schema.js";
+import * as migrationDefinitions from "./migrations.js";
+
+const app = defineTestApp({
+  schema,
+  components: { migrations: component },
+});
+const { internal, createTest } = app.defineModules({
+  migrations: migrationDefinitions,
+});
+
+test("test setDefaultValue migration", async () => {
+  const t = createTest();
+
+  // Add sample data that matches your schema, without optionalField.
+  await t.run(async (ctx) => {
+    await ctx.db.insert("myTable", {
+      requiredField: "example",
+      unionField: "value",
+    });
+  });
+
+  await t.run(async (ctx) => {
+    await runToCompletion(
+      ctx,
+      app.components.migrations,
+      internal.migrations.setDefaultValue,
+      { batchSize: 1 },
+    );
+  });
+
+  await t.run(async (ctx) => {
+    const docs = await ctx.db.query("myTable").collect();
+    expect(docs).toHaveLength(1);
+    expect(docs[0].optionalField).toBe("default");
+  });
+});
+```
+
+If you already use `convexTest(schema, modules)`, you can keep that setup and
+register the component with `component.register(t)`. It returns a typed
+component API that can also be passed to `runToCompletion`.
